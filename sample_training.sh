@@ -11,7 +11,7 @@ CUDA_VISIBLE_DEVICES=0 python ./scripts/run_experiment.py \
 --per_gpu_eval_batch_size 4 \
 --per_gpu_train_batch_size 16 \
 --learning_rate 1e-5 \
---num_train_epochs 3 \
+--num_train_epochs 1 \
 --output_dir ./output/models/ \
 --do_train \
 --logging_steps 4752 \

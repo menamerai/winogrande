@@ -57,6 +57,18 @@ from scripts.utils import (compute_metrics, convert_examples_to_features,
                                 output_modes, processors,
                                 convert_multiple_choice_examples_to_features)
 
+import wandb
+
+wandb.init(
+    project="winogrande-roberta",
+    config={
+        "learning_rate": 1e-5,
+        "architecture": "Roberta",
+        "dataset": "Winogrande",
+        "epochs": 1,
+    }
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +181,7 @@ def train(args, train_dataset, model, tokenizer):
                 torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
 
             tr_loss += loss.item()
+            wandb.log({"loss": loss.item()})
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 optimizer.step()
                 scheduler.step()  # Update learning rate schedule
@@ -204,6 +217,8 @@ def train(args, train_dataset, model, tokenizer):
 
     if args.local_rank in [-1, 0]:
         tb_writer.close()
+
+    wandb.finish()
 
     return global_step, tr_loss / global_step
 
