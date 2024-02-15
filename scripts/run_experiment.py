@@ -166,6 +166,7 @@ def train(args, train_dataset, model, tokenizer):
                       'labels':         batch[3]}
             outputs = model(**inputs)
             loss = outputs[0]  # model outputs are always tuple in pytorch-transformers (see doc)
+            logits = outputs[1]
 
             if args.n_gpu > 1:
                 loss = loss.mean() # mean() to average on multi-gpu parallel training
@@ -182,6 +183,18 @@ def train(args, train_dataset, model, tokenizer):
 
             tr_loss += loss.item()
             wandb.log({"loss": loss.item()})
+
+            preds = logits.detach().cpu().numpy()
+            out_label_ids = inputs['labels'].detach().cpu().numpy()
+            if args.output_mode == "classification" or args.output_mode == "multiple_choice":
+                preds = np.argmax(preds, axis=1)
+            elif args.output_mode == "regression":
+                preds = np.squeeze(preds)
+
+            result = compute_metrics("winogrande", preds, out_label_ids)
+
+            wandb.log({"accuracy": result["acc"]})
+
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 optimizer.step()
                 scheduler.step()  # Update learning rate schedule
