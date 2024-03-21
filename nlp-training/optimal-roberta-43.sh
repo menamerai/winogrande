@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CUDA_VISIBLE_DEVICES=0 python ./scripts/run_experiment.py \
+CUDA_VISIBLE_DEVICES=1 python ./scripts/run_experiment.py \
 --model_type roberta_mc \
 --model_name_or_path roberta-large \
 --task_name winogrande \
@@ -12,12 +12,12 @@ CUDA_VISIBLE_DEVICES=0 python ./scripts/run_experiment.py \
 --per_gpu_train_batch_size 64 \
 --learning_rate 1e-5 \
 --num_train_epochs 8 \
---output_dir ./output/roberta-42 \
+--output_dir ./output/roberta-43 \
 --do_train \
 --logging_steps 100 \
 --save_steps 4750 \
---seed 42 \
---data_cache_dir ./output/roberta-cache-42 \
+--seed 43 \
+--data_cache_dir ./output/roberta-cache-43 \
 --warmup_pct 0.1 \
 --evaluate_during_training \
 --overwrite_output_dir

@@ -32,6 +32,7 @@ import random
 import math
 
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
                               TensorDataset)
@@ -186,6 +187,26 @@ def train(args, train_dataset, model, tokenizer):
 
             wandb.log({"train_accuracy": result["acc"]})
 
+            # log problem (decoded input_ids), label, prediction, loss into csv with pandas
+            if args.local_rank in [-1, 0]:
+                if step == 0:
+                    df = {
+                        "sentence_1": [],
+                        "sentence_2": [],
+                        "label": [],
+                        "prediction": [],
+                        "loss": [],
+                    }
+                for i in range(args.train_batch_size):
+                    if out_label_ids[i] != preds[i]: # only error cases
+                        inp_ids_1 = inputs['input_ids'][i][0].detach().cpu().numpy()
+                        df["sentence_1"].append(" ".join(tokenizer.decode(inp_ids_1)).replace("<pad>", "").strip())
+                        inp_ids_2 = inputs['input_ids'][i][1].detach().cpu().numpy()
+                        df["sentence_2"].append(" ".join(tokenizer.decode(inp_ids_2)).replace("<pad>", "").strip())
+                        df["label"].append(out_label_ids[i])
+                        df["prediction"].append(preds[i])
+                        df["loss"].append(loss.item())
+                    
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 optimizer.step()
                 scheduler.step()  # Update learning rate schedule
@@ -221,6 +242,8 @@ def train(args, train_dataset, model, tokenizer):
 
     if args.local_rank in [-1, 0]:
         tb_writer.close()
+        output_dir = os.path.join(args.output_dir, f'train_log-{global_step}.csv')
+        pd.DataFrame(df).to_csv(output_dir, index=False)
 
 
     return global_step, tr_loss / global_step
