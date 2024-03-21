@@ -49,6 +49,7 @@ from pytorch_transformers import (WEIGHTS_NAME, BertConfig,
                                   XLNetForSequenceClassification,
                                   XLNetTokenizer)
 
+
 from pytorch_transformers import AdamW, WarmupLinearSchedule
 
 #from scripts.adhoc_models import RobertaForMultipleChoice
@@ -58,16 +59,6 @@ from utils import (compute_metrics, convert_examples_to_features,
                                 convert_multiple_choice_examples_to_features)
 
 import wandb
-
-wandb.init(
-    project="winogrande-roberta",
-    config={
-        "learning_rate": 1e-5,
-        "architecture": "Roberta",
-        "dataset": "Winogrande",
-        "epochs": 1,
-    }
-)
 
 
 logger = logging.getLogger(__name__)
@@ -193,7 +184,7 @@ def train(args, train_dataset, model, tokenizer):
 
             result = compute_metrics("winogrande", preds, out_label_ids)
 
-            wandb.log({"accuracy": result["acc"]})
+            wandb.log({"train_accuracy": result["acc"]})
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 optimizer.step()
@@ -231,7 +222,6 @@ def train(args, train_dataset, model, tokenizer):
     if args.local_rank in [-1, 0]:
         tb_writer.close()
 
-    wandb.finish()
 
     return global_step, tr_loss / global_step
 
@@ -301,6 +291,7 @@ def evaluate(args, model, tokenizer, processor, prefix="", eval_split=None):
 
         if not eval_split == "test":
             result = compute_metrics(eval_task, preds, out_label_ids)
+            wandb.log({"dev_accuracy": result["acc"]})
             result_split = {}
             for k, v in result.items():
                 result_split[k + "_{}".format(eval_split)] = v
@@ -577,6 +568,20 @@ def main():
 
     # Training
     if args.do_train:
+        wandb.init(
+            project="winogrande-roberta",
+            config={
+                "learning_rate": args.learning_rate,
+                "architecture": args.model_type,
+                "dataset": args.task_name,
+                "epochs": args.num_train_epochs,
+                "batch_size": args.per_gpu_train_batch_size,
+                "warmup_pct": args.warmup_pct,
+                "max_seq_length": args.max_seq_length,
+                "model": args.model_type,
+                "seed": args.seed
+            }
+        )
         train_dataset = load_and_cache_examples(args, args.task_name, tokenizer, evaluate=False)
         global_step, tr_loss = train(args, train_dataset, model, tokenizer)
         logger.info(" global_step = %s, average loss = %s", global_step, tr_loss)
@@ -631,6 +636,7 @@ def main():
         results.update(result)
 
     logger.info("***** Experiment finished *****")
+    wandb.finish()
     return results
 
 

@@ -10,14 +10,14 @@ CUDA_VISIBLE_DEVICES=0 python ./scripts/run_experiment.py \
 --max_seq_length 128 \
 --per_gpu_eval_batch_size 16 \
 --per_gpu_train_batch_size 64 \
---learning_rate 1e-6 \
---num_train_epochs 3 \
---output_dir ./output/models/ \
+--learning_rate 1e-5 \
+--num_train_epochs 8 \
+--output_dir ./output/roberta \
 --do_train \
 --logging_steps 100 \
 --save_steps 4750 \
 --seed 42 \
---data_cache_dir ./output/cache/ \
+--data_cache_dir ./output/roberta-cache \
 --warmup_pct 0.1 \
 --evaluate_during_training \
 --overwrite_output_dir
