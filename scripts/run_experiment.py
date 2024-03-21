@@ -244,7 +244,7 @@ def train(args, train_dataset, model, tokenizer):
                 break
 
         if args.local_rank == -1 and args.evaluate_during_training:
-            print("Evaluating at the end of epoch {}".format(epoch)
+            print("Evaluating at the end of epoch {}".format(epoch))
             results = evaluate(args, model, tokenizer, processor, eval_split="dev", epoch=epoch)
 
         epoch += 1
