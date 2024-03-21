@@ -147,6 +147,7 @@ def train(args, train_dataset, model, tokenizer):
     model.zero_grad()
     train_iterator = trange(int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0])
     # set_seed(args)  # Added here for reproductibility (even between python 2 and 3)
+    epoch = 1
     for _ in train_iterator:
         epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0], mininterval=10, ncols=100)
         for step, batch in enumerate(epoch_iterator):
@@ -188,26 +189,26 @@ def train(args, train_dataset, model, tokenizer):
             wandb.log({"train_accuracy": result["acc"]})
 
             # log problem (decoded input_ids), label, prediction, loss into csv with pandas
-            if args.local_rank in [-1, 0]:
-                if global_step == 0:
-                    df = {
-                        "sentence_1": [],
-                        "sentence_2": [],
-                        "label": [],
-                        "prediction": [],
-                        "loss": [],
-                        "global_step": []
-                    }
-                for i in range(len(out_label_ids)):
-                    if out_label_ids[i] != preds[i]: # only error cases
-                        inp_ids_1 = inputs['input_ids'][i][0].detach().cpu().numpy()
-                        df["sentence_1"].append(" ".join(tokenizer.decode(inp_ids_1)).replace("<pad>", "").strip())
-                        inp_ids_2 = inputs['input_ids'][i][1].detach().cpu().numpy()
-                        df["sentence_2"].append(" ".join(tokenizer.decode(inp_ids_2)).replace("<pad>", "").strip())
-                        df["label"].append(out_label_ids[i])
-                        df["prediction"].append(preds[i])
-                        df["loss"].append(loss.item())
-                        df["global_step"].append(global_step)
+            # if args.local_rank in [-1, 0]:
+            #     if global_step == 0:
+            #         df = {
+            #             "sentence_1": [],
+            #             "sentence_2": [],
+            #             "label": [],
+            #             "prediction": [],
+            #             "loss": [],
+            #             "global_step": []
+            #         }
+            #     for i in range(len(out_label_ids)):
+            #         if out_label_ids[i] != preds[i]: # only error cases
+            #             inp_ids_1 = inputs['input_ids'][i][0].detach().cpu().numpy()
+            #             df["sentence_1"].append(" ".join(tokenizer.decode(inp_ids_1)).replace("<pad>", "").strip())
+            #             inp_ids_2 = inputs['input_ids'][i][1].detach().cpu().numpy()
+            #             df["sentence_2"].append(" ".join(tokenizer.decode(inp_ids_2)).replace("<pad>", "").strip())
+            #             df["label"].append(out_label_ids[i])
+            #             df["prediction"].append(preds[i])
+            #             df["loss"].append(loss.item())
+            #             df["global_step"].append(global_step)
                     
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 optimizer.step()
@@ -225,8 +226,8 @@ def train(args, train_dataset, model, tokenizer):
                     tb_writer.add_scalar('loss', (tr_loss - logging_loss)/args.logging_steps, global_step)
                     logging_loss = tr_loss
 
-                    output_dir = os.path.join(args.output_dir, f'train_log-{global_step}.csv')
-                    pd.DataFrame(df).to_csv(output_dir, index=False)
+                    # output_dir = os.path.join(args.output_dir, f'train_log-{global_step}.csv')
+                    # pd.DataFrame(df).to_csv(output_dir, index=False)
 
                 if args.local_rank in [-1, 0] and args.save_steps > 0 and global_step % args.save_steps == 0:
                     # Save model checkpoint
@@ -241,20 +242,26 @@ def train(args, train_dataset, model, tokenizer):
             if args.max_steps > 0 and global_step > args.max_steps:
                 epoch_iterator.close()
                 break
+
+        if args.local_rank == -1 and args.evaluate_during_training:  # Only evaluate when single GPU otherwise metrics may not average well
+            results = evaluate(args, model, tokenizer, processor, eval_split="dev", epoch=epoch)
+
+        epoch += 1
+        
         if args.max_steps > 0 and global_step > args.max_steps:
             train_iterator.close()
             break
 
     if args.local_rank in [-1, 0]:
         tb_writer.close()
-        output_dir = os.path.join(args.output_dir, f'train_log_all.csv')
-        pd.DataFrame(df).to_csv(output_dir, index=False)
+        # output_dir = os.path.join(args.output_dir, f'train_log_all.csv')
+        # pd.DataFrame(df).to_csv(output_dir, index=False)
 
 
     return global_step, tr_loss / global_step
 
 
-def evaluate(args, model, tokenizer, processor, prefix="", eval_split=None):
+def evaluate(args, model, tokenizer, processor, prefix="", eval_split=None, epoch=None):
 
     eval_task_names = (args.task_name,)
     eval_outputs_dirs = (args.output_dir,)
@@ -333,7 +340,10 @@ def evaluate(args, model, tokenizer, processor, prefix="", eval_split=None):
                     writer.write("%s = %s\n" % (key, str(result_split[key])))
 
         # predictions
-        output_pred_file = os.path.join(eval_output_dir, "predictions_{}.lst".format(eval_split))
+        if epoch is None:
+            output_pred_file = os.path.join(eval_output_dir, "predictions_{}.lst".format(eval_split))
+        else:
+            output_pred_file = os.path.join(eval_output_dir, "predictions_{}_{}.lst".format(eval_split, epoch))
         with open(output_pred_file, "w") as writer:
             logger.info("***** Write predictions {} on {} *****".format(prefix, eval_split))
             for pred in preds:
