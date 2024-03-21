@@ -189,15 +189,16 @@ def train(args, train_dataset, model, tokenizer):
 
             # log problem (decoded input_ids), label, prediction, loss into csv with pandas
             if args.local_rank in [-1, 0]:
-                if step == 0:
+                if global_step == 0:
                     df = {
                         "sentence_1": [],
                         "sentence_2": [],
                         "label": [],
                         "prediction": [],
                         "loss": [],
+                        "global_step": []
                     }
-                for i in range(args.train_batch_size):
+                for i in range(len(out_label_ids)):
                     if out_label_ids[i] != preds[i]: # only error cases
                         inp_ids_1 = inputs['input_ids'][i][0].detach().cpu().numpy()
                         df["sentence_1"].append(" ".join(tokenizer.decode(inp_ids_1)).replace("<pad>", "").strip())
@@ -206,6 +207,7 @@ def train(args, train_dataset, model, tokenizer):
                         df["label"].append(out_label_ids[i])
                         df["prediction"].append(preds[i])
                         df["loss"].append(loss.item())
+                        df["global_step"].append(global_step)
                     
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 optimizer.step()
@@ -222,6 +224,9 @@ def train(args, train_dataset, model, tokenizer):
                     tb_writer.add_scalar('lr', scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar('loss', (tr_loss - logging_loss)/args.logging_steps, global_step)
                     logging_loss = tr_loss
+
+                    output_dir = os.path.join(args.output_dir, f'train_log-{global_step}.csv')
+                    pd.DataFrame(df).to_csv(output_dir, index=False)
 
                 if args.local_rank in [-1, 0] and args.save_steps > 0 and global_step % args.save_steps == 0:
                     # Save model checkpoint
@@ -242,7 +247,7 @@ def train(args, train_dataset, model, tokenizer):
 
     if args.local_rank in [-1, 0]:
         tb_writer.close()
-        output_dir = os.path.join(args.output_dir, f'train_log-{global_step}.csv')
+        output_dir = os.path.join(args.output_dir, f'train_log_all.csv')
         pd.DataFrame(df).to_csv(output_dir, index=False)
 
 

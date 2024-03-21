@@ -14,7 +14,7 @@ CUDA_VISIBLE_DEVICES=0 python ./scripts/run_experiment.py \
 --num_train_epochs 8 \
 --output_dir ./output/roberta-42 \
 --do_train \
---logging_steps 100 \
+--logging_steps 4750 \
 --save_steps 4750 \
 --seed 42 \
 --data_cache_dir ./output/roberta-cache-42 \
